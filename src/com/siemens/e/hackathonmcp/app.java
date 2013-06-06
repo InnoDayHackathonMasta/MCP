@@ -14,4 +14,8 @@ public class app extends Application {
 		return UUID.fromString(BT_UUID_CLIENTINFO);
 	}
 	
+	UUID getBT_UUID_CHAIN () {
+		return UUID.fromString(BT_UUID_CHAIN);
+	}
+	
 }
