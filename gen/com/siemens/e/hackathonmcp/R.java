@@ -25,13 +25,8 @@ public final class R {
     }
     public static final class id {
         public static final int LinearLayout1=0x7f080000;
-        public static final int action_settings=0x7f080008;
-        public static final int button1=0x7f080003;
-        public static final int button2=0x7f080004;
-        public static final int button3=0x7f080006;
-        public static final int button4=0x7f080007;
-        public static final int tableRow1=0x7f080002;
-        public static final int tableRow2=0x7f080005;
+        public static final int action_settings=0x7f080003;
+        public static final int main_btn_start_mcp=0x7f080002;
         public static final int textView1=0x7f080001;
     }
     public static final class layout {
