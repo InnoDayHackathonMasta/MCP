@@ -6,10 +6,6 @@ import android.app.Application;
 
 public class app extends Application {
 	
-	private enum ClientQueryThread {
-		ACTIVE, PAUSING, DISABLED
-	}
-	
 	public static final String BT_UUID_CHAIN = "201BB686-672C-46FA-B86B-B9BA8BAACE71";
 	public static final String BT_UUID_CLIENTINFO = "7F814AFE-90D0-4768-ADAD-89FD2F7F851A";
 	public String currentTail;
