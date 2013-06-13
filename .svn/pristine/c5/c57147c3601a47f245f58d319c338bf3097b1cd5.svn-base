@@ -6,12 +6,8 @@ import android.app.Application;
 
 public class app extends Application {
 	
-	public static enum ClientQueryThreadStatus {
-		ACTIVE, OFF
-	}
-	
-	public static enum ChainThreadStatus {
-		ACTIVE, OFF
+	private enum ClientQueryThread {
+		ACTIVE, PAUSING, DISABLED
 	}
 	
 	public static final String BT_UUID_CHAIN = "201BB686-672C-46FA-B86B-B9BA8BAACE71";
@@ -19,25 +15,6 @@ public class app extends Application {
 	
 	String currentTail;
 	int currentTailId;
-	
-	ChainThreadStatus chainThreadStatus = ChainThreadStatus.OFF;
-	ClientQueryThreadStatus clientQueryThreadStatus = ClientQueryThreadStatus.OFF;
-	
-	public ClientQueryThreadStatus getClientQueryThreadStatus() {
-		return clientQueryThreadStatus;
-	}
-
-	public void setClientQueryThreadStatus(ClientQueryThreadStatus clientQueryThreadStatus) {
-		this.clientQueryThreadStatus = clientQueryThreadStatus;
-	}
-
-	public ChainThreadStatus getChainThreadStatus () {
-		return chainThreadStatus;
-	}
-	
-	public void setChainThreadStatus (ChainThreadStatus chainThreadStatus) {
-		this.chainThreadStatus = chainThreadStatus;
-	}
 	
 	public int getCurrentTailId() {
 		return currentTailId;

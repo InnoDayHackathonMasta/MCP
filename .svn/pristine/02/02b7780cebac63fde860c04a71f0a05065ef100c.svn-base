@@ -3,6 +3,7 @@ package com.siemens.e.hackathonmcp;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -12,22 +13,11 @@ import android.bluetooth.BluetoothSocket;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
-import android.text.Editable;
-import android.text.Spannable;
-import android.text.TextWatcher;
-import android.text.method.MovementMethod;
-import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
-import android.view.KeyEvent;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.TextView;
-
-import com.siemens.e.hackathonmcp.app.ChainThreadStatus;
-import com.siemens.e.hackathonmcp.app.ClientQueryThreadStatus;
 
 public class MainActivity extends Activity {
 
@@ -39,7 +29,6 @@ public class MainActivity extends Activity {
 	BluetoothAdapter mBluetoothAdapter = null;
 	ClientQueryThread cqt = null;
 	ChainEndServerAcceptThread cat = null;
-	ChainThread ct = null;
 
 	Button btnStartMCP = null;
 
@@ -50,7 +39,6 @@ public class MainActivity extends Activity {
 	private Button btnReorderSend;
 	private Button btnStart;
 	private Button btnStop;
-	private EditText edtReorder;
 
 
 	@Override
@@ -64,9 +52,6 @@ public class MainActivity extends Activity {
 		Log.i(TAG, "enabling Bluetooth");
 		mBluetoothAdapter.enable();
 
-		// Init: Set ourselve to be the chain end 
-		appObj.setCurrentTail(mBluetoothAdapter.getAddress());
-
 		btnStartMCP = (Button)findViewById(R.id.main_btn_be_mcp);
 		btnKillChain = (Button) findViewById(R.id.main_btn_kill_chain);
 		btnManualTextSend = (Button) findViewById(R.id.main_btn_manualtext_send);
@@ -74,17 +59,13 @@ public class MainActivity extends Activity {
 		btnStart = (Button) findViewById(R.id.main_btn_start);
 		btnStop = (Button) findViewById(R.id.main_btn_stop);
 
-		edtReorder = (EditText)findViewById(R.id.main_edt_reordertext);
-
 		btnKillChain.setEnabled(false);
 		btnManualTextSend.setEnabled(false);
-		//		btnReorderSend.setEnabled(false);
+		btnReorderSend.setEnabled(false);
 		btnStart.setEnabled(false);
 		btnStop.setEnabled(false);
 
-		tvLogOut = (TextView) findViewById(R.id.main_txt_log_output);
-
-		tvLogOut.setMovementMethod(new ScrollingMovementMethod());
+		tvLogOut = (TextView) findViewById(R.id.main_txt_log_output);		
 
 		btnStartMCP.setOnClickListener(new OnClickListener() {
 
@@ -100,80 +81,10 @@ public class MainActivity extends Activity {
 
 				cat = new ChainEndServerAcceptThread(false);
 				cat.start();
-
-				btnStartMCP.setEnabled(false);
 			}
 		});
 
-		btnReorderSend.setOnClickListener(new OnClickListener() {
 
-			@Override
-			public void onClick(View v) {
-				String newOrder = edtReorder.getText().toString(); 
-				sendReorderString(newOrder);
-			}
-		});
-
-	}
-
-	private void sendReorderString (String newOrder) {
-
-		int numChainMembers = appObj.getCurrentTailId();
-
-		StringBuilder messageToSend = new StringBuilder("R,");
-
-		for (int i=0; i < numChainMembers; i++) {
-			messageToSend.append(i);
-		}
-
-		messageToSend.append("," + newOrder);
-
-		sendChainMessage(messageToSend.toString());
-		shutDownClientQueryThread ();
-		btnManualTextSend.setEnabled(true);
-		btnStart.setEnabled(true);
-		btnStop.setEnabled(true);
-
-	}
-
-	private void shutDownClientQueryThread() {
-
-		if (appObj.getClientQueryThreadStatus() == ClientQueryThreadStatus.ACTIVE) {
-			if (cqt != null) {
-				cqt.cancel();
-				appObj.setClientQueryThreadStatus(ClientQueryThreadStatus.OFF);
-			} else {
-				AppendToLogView("was asked to end ClientQueryThread but Thread is NULL");
-			}
-		} else {
-			AppendToLogView("was asked to end ClientQueryThread but Status is already OFF");
-		}
-
-	}
-
-	private void sendChar (String character, int logicalId) {
-		String messageToSend = "D," + character + "," + logicalId;
-		sendChainMessage(messageToSend);
-	}
-
-	private void sendChainMessage (String messageToSend) {
-
-		if (appObj.getChainThreadStatus() == ChainThreadStatus.ACTIVE) {
-			if (ct != null) {
-				ct.write(messageToSend.getBytes());
-			} else {
-				AppendToLogView("was asked to send: " + messageToSend + " but ChainThread is NULL");
-				final int scrollAmount = tvLogOut.getLayout().getLineTop(tvLogOut.getLineCount()) - tvLogOut.getHeight();
-				// if there is no need to scroll, scrollAmount will be <=0
-				if (scrollAmount > 0)
-					tvLogOut.scrollTo(0, scrollAmount);
-				else
-					tvLogOut.scrollTo(0, 0);
-			}
-
-		} else {
-			AppendToLogView("was asked to send: " + messageToSend + " but ChainThread is OFF");
-		}
 
 	}
 
@@ -197,7 +108,7 @@ public class MainActivity extends Activity {
 		@SuppressLint("NewApi")
 		public ClientQueryThread(boolean secure) {
 
-			if (DEBUG) Log.i(TAG, "ClientQueryThread started");
+			if (DEBUG) Log.i(TAG, "+++ Accept Thread started +++");
 			BluetoothServerSocket tmp = null;
 			mSocketType = secure ? "Secure":"Insecure";
 
@@ -209,10 +120,9 @@ public class MainActivity extends Activity {
 			} catch (IOException e) {
 				Log.e(TAG, "Socket Type: " + mSocketType + "listen() failed", e);
 			}
+
 			mmServerSocket = tmp;
 
-			// Set State to active
-			appObj.setClientQueryThreadStatus(ClientQueryThreadStatus.ACTIVE);
 		}
 
 		public void run() {
@@ -242,18 +152,19 @@ public class MainActivity extends Activity {
 					byte[] buffer = new byte[1024];  // buffer store for the stream
 					int bytes; // bytes returned from read()
 
-					if (DEBUG) Log.i(TAG, "ClientQueryThread has established a connection");
+					if (DEBUG) Log.i(TAG, "+++++++ WE GOT A CONNECTION +++++++");
 
 					// Get the output stream
 					try {
 						mmOutStream = socket.getOutputStream();
 					} catch (IOException e) { 
-						if (DEBUG) Log.d(TAG, "ClientQueryThread: Could not get Outputstream from socket");
+						if (DEBUG) Log.d(TAG, "Could not get Outputstream from Clientchain Socket");
 					}
 
 					// Keep listening to the InputStream until an exception occurs
 					try {
 						// Read from the InputStream
+						Log.d(TAG, "Trying to send Mac");
 
 						String remoteName;
 						remoteName = socket.getRemoteDevice().getName();
@@ -261,21 +172,27 @@ public class MainActivity extends Activity {
 						if (remoteName == null ) {
 							remoteName = "unknown";
 						}
-						Log.d(TAG, "ClientQueryThread: Trying to send MAC Adress to " + remoteName);
+						Log.d(TAG, "Client: asked for Tail End: " + remoteName);
 
 						// Post Update to log textview in Main Screen
-						String logViewText = "Client (" + remoteName + ") asked for tail end";
-						if (handler.post(new AppendToLogViewRunnable(logViewText))== false) Log.d(TAG, "could not place Runnable in queue") ;
+						if (handler.post(new StatusRunnable(remoteName) {
 
-						String message = appObj.getCurrentTail() + "," + appObj.getCurrentTailId()+1;
+							@Override
+							public void run() {
+								// Add Entry to log file
+								tvLogOut.append("Client (" + statusText + ") asked for tail end\n");
+								tvLogOut.requestLayout(); // GAAANZ WICHTIG, sonst wirds nicht angezeigt... 
+							}
 
-						mmOutStream.write(message.getBytes());
+						})== false) Log.d(TAG, "could not place Runnable in queue") ;
+
+						mmOutStream.write(mBluetoothAdapter.getAddress().getBytes());
 						mmOutStream.flush(); 
 
-						Log.d(TAG, "Successfully sent Message to " +remoteName + ":" + message); 
+						Log.d(TAG, "Successfully sent MacAdress: " + mBluetoothAdapter.getAddress()); 
 
 					} catch (IOException e) {
-						Log.d(TAG, "Could not send MacAdress+id to querieng thread");
+						Log.d(TAG, "Shit, could not send MacAdress: " + mBluetoothAdapter.getAddress());
 					}
 
 				}
@@ -352,9 +269,8 @@ public class MainActivity extends Activity {
 				if (socket != null) {
 					if (DEBUG) Log.i(TAG, "+++++++ WE GOT A CONNECTION FOR THE CHAIN END +++++++");
 
-					// Start a ChainThread and pass the socket 
-					ct = new ChainThread(socket);
-					ct.start();
+					ChainThread theChain = new ChainThread(socket);
+					theChain.start();
 
 				}
 			}
@@ -382,8 +298,6 @@ public class MainActivity extends Activity {
 			InputStream tmpIn = null;
 			OutputStream tmpOut = null;
 
-			Log.d(TAG, socket.getRemoteDevice().getName() + " is first chain member");
-
 			// Get the input and output streams, using temp objects because
 			// member streams are final
 			try {
@@ -393,53 +307,33 @@ public class MainActivity extends Activity {
 
 			mmInStream = tmpIn;
 			mmOutStream = tmpOut;
-			
-			// Post Update to log textview in Main Screen
-			if (handler.post(new AppendToLogViewRunnable(socket.getRemoteDevice().getName() + " is first chain member")
-					) == false) Log.d(TAG, "could not place Runnable in queue") ;
-
-			// Post UI changes
-			
-			
 		}
 
-
-		/**
-		 * Reads and writes Data to the chain
-		 */
 		public void run() {
 			byte[] buffer = new byte[1024];  // buffer store for the stream
 			int bytes; // bytes returned from read()
 			Log.d(TAG, "ChainServer: We made it to connect!");
 
-			appObj.setChainThreadStatus(ChainThreadStatus.ACTIVE);
-			//			btnReorderSend.setEnabled(true);
-			//			btnKillChain.setEnabled(true);
+			// Keep listening to the InputStream until an exception occurs
+			try {
+				// Read from the InputStream
+				Log.d(TAG, "Chain: Waiting for Data...");
 
-			// Endless loop
-			while (appObj.getChainThreadStatus() == ChainThreadStatus.ACTIVE) {
+				bytes = mmInStream.read(buffer);
+				ByteBuffer bb = ByteBuffer.wrap(buffer);
 
-				// Keep listening to the InputStream until an exception occurs
-				try {
-					// Read from the InputStream
-					Log.d(TAG, "Chain: Waiting for Data...");
+				// handle tail's macaddress update
+				// ASCII A = 65 = Announcement
+				if(bb.get() == 65){	
+					byte[] tmpBytes = bb.array();
+					String tmpMac = new String(tmpBytes);
 
-					bytes = mmInStream.read(buffer);
-
-					// handle tail's macaddress update
-					// ASCII a = 97 = Announcement
-					if(buffer[0] == 97){
-
-						// Store the Mac Adress of the new Chain Tail and increase the physical ID (+1)
-						String newTailMac = Utility.extractMAC(buffer, 1);
-						appObj.setCurrentTail(newTailMac);
-						appObj.currentTailId +=1;
-						Log.d(TAG, "new Tail MAC: " + newTailMac);
-					}
-
-				} catch (IOException e) {
-					Log.d(TAG, "Shit, ChainDropped");
+					Log.d(TAG, "CHAIN This should be the MAC: " + tmpMac);
 				}
+
+				Log.d(TAG, "CHAIN Incoming Message: " +buffer.toString());
+			} catch (IOException e) {
+				Log.d(TAG, "Shit, ChainDropped");
 			}
 		}
 
@@ -447,22 +341,12 @@ public class MainActivity extends Activity {
 		public void write(byte[] bytes) {
 			try {
 				mmOutStream.write(bytes);
-				Log.d(TAG, "ChainThread: Sending data to Chain");
-			} catch (IOException e) { 
-				Log.d(TAG, "IO Error writing to Chain", e);
-			}
+			} catch (IOException e) { }
 		}
 
 		/* Call this from the main activity to shutdown the connection */
 		public void cancel() {
 			try {
-				// Tell Thread to stop
-				appObj.setChainThreadStatus(ChainThreadStatus.OFF);
-
-				// Start listening again for incoming connections
-				cat = new ChainEndServerAcceptThread(false);
-				cat.start();
-
 				mmSocket.close();
 			} catch (IOException e) { }
 		}
@@ -478,45 +362,18 @@ public class MainActivity extends Activity {
 		}
 	}
 
-	
-	/**
-	 * Utility function to append a line to the tvLogOut TextView which automagically scrolls down
-	 * to the last / most recent line.
-	 * 
-	 * @param logLine
-	 */
-	private void AppendToLogView (String logLine) {
-		tvLogOut.append(logLine + "\n");
+	public class StatusRunnable implements Runnable {
 
-		// Do the scroll stuff
-		final int scrollAmount = tvLogOut.getLayout().getLineTop(tvLogOut.getLineCount()) - tvLogOut.getHeight();
-		// if there is no need to scroll, scrollAmount will be <=0
-		if (scrollAmount > 0)
-			tvLogOut.scrollTo(0, scrollAmount);
-		else
-			tvLogOut.scrollTo(0, 0);
-	}
+		protected String statusText; 
 
-	/**
-	 * Wraps AppendToLogView into a Runnable for the lovely .post() calls
-	 * @author gries01d
-	 *
-	 */
-	public class AppendToLogViewRunnable implements Runnable {
-
-		protected String logLine; 
-
-		public AppendToLogViewRunnable (String logLine) {
-			this.logLine = logLine;
+		public StatusRunnable (String statusText) {
+			this.statusText = statusText;
 		}
 
 		@Override
 		public void run() {
-			// Append Line
-			AppendToLogView (logLine);
+			// PlaceHolder (Anyway overriden)
 		}
-
 	}
 
-	
 }
