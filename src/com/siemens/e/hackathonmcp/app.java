@@ -19,7 +19,16 @@ public class app extends Application {
 	
 	String currentTail;
 	int currentTailId;
+	int numChainMembers = -1;
 	
+	public int getNumChainMembers() {
+		return numChainMembers;
+	}
+
+	public void setNumChainMembers(int numChainMembers) {
+		this.numChainMembers = numChainMembers;
+	}
+
 	ChainThreadStatus chainThreadStatus = ChainThreadStatus.OFF;
 	ClientQueryThreadStatus clientQueryThreadStatus = ClientQueryThreadStatus.OFF;
 	

@@ -10,7 +10,7 @@ public class Utility {
 		Charset charset = Charset.forName("US-ASCII");
 		int i;
 		for (i = 0; i < byteArray.length && byteArray[i] != 0; i++) { }
-		return new String(byteArray, index, i, charset);
+		return new String(byteArray, index, i-1, charset);
 		
 	}
 	

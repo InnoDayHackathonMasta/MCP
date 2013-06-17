@@ -55,8 +55,7 @@ public class MainActivity extends Activity {
 	private Button btnStop;
 	private EditText edtReorder;
 
-	private Button[] btnPhysID = new Button[10];
-	private EditText edtManualText; 
+	private Button[] btnPhysID = new Button[10]; 
 
 
 	@Override
@@ -80,9 +79,7 @@ public class MainActivity extends Activity {
 		btnStart = (Button) findViewById(R.id.main_btn_start);
 		btnStop = (Button) findViewById(R.id.main_btn_stop);
 		tvLogOut = (TextView) findViewById(R.id.main_txt_log_output);
-		
 		edtReorder = (EditText)findViewById(R.id.main_edt_reordertext);
-		edtManualText = (EditText)findViewById(R.id.main_edt_manualtext);
 
 		btnKillChain.setEnabled(false);
 		btnManualTextSend.setEnabled(false);
@@ -121,51 +118,27 @@ public class MainActivity extends Activity {
 				sendReorderString(newOrder);
 			}
 		});
-		
-		btnManualTextSend.setOnClickListener(new OnClickListener() {
-			
-			@Override
-			public void onClick(View v) {
-				// Send a manual text to the devices
-				String manualText = edtManualText.getText().toString();
-				sendManualString (manualText);
-			}
-		});
 
 	}
 
-	private void sendManualString (String manualText) {
-		
-		manualText = manualText.substring(0, appObj.getNumChainMembers());
 
-		for (int i=1; i <= appObj.getNumChainMembers(); i++) {
-			
-			StringBuilder messageToSend = new StringBuilder("D,");
-			messageToSend.append(i + ",");
-			messageToSend.append(manualText.charAt(i-1));
-			sendChainMessage(messageToSend.toString());
-			
-		}
-
-	}
-	
-	
 	private void sendReorderString (String newOrder) {
 
 		int numChainMembers = appObj.getCurrentTailId();
-		appObj.setNumChainMembers(numChainMembers);
 
-		newOrder = newOrder.substring(0, numChainMembers);
-		
 		StringBuilder messageToSend = new StringBuilder("R,");
 
-		messageToSend.append(newOrder);
+		for (int i=0; i < numChainMembers; i++) {
+			messageToSend.append(i);
+		}
+
+		messageToSend.append("," + newOrder);
 
 		sendChainMessage(messageToSend.toString());
 		shutDownClientQueryThread ();
 		edtReorder.setEnabled(false);
 		//TODO: Wieder auskommentieren, damit es so funktioniert wie es soll
-		btnReorderSend.setEnabled(false);
+		// btnReorderSend.setEnabled(false);
 		btnManualTextSend.setEnabled(true);
 		btnStart.setEnabled(true);
 		btnStop.setEnabled(true);
@@ -194,8 +167,6 @@ public class MainActivity extends Activity {
 
 	private void sendChainMessage (String messageToSend) {
 
-		messageToSend += "\0";
-		
 		if (appObj.getChainThreadStatus() == ChainThreadStatus.ACTIVE) {
 			if (ct != null) {
 				ct.write(messageToSend.getBytes());
@@ -507,9 +478,6 @@ public class MainActivity extends Activity {
 		public void write(byte[] bytes) {
 			try {
 				mmOutStream.write(bytes);
-				mmOutStream.flush();
-				
-				
 				Log.d(TAG, "ChainThread: Sending data to Chain");
 			} catch (IOException e) { 
 				Log.d(TAG, "IO Error writing to Chain", e);

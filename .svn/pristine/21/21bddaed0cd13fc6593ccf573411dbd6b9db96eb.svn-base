@@ -22,11 +22,8 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.view.ViewGroup.LayoutParams;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.TableLayout;
-import android.widget.TableRow;
 import android.widget.TextView;
 
 import com.siemens.e.hackathonmcp.app.ChainThreadStatus;
@@ -55,9 +52,6 @@ public class MainActivity extends Activity {
 	private Button btnStop;
 	private EditText edtReorder;
 
-	private Button[] btnPhysID = new Button[10];
-	private EditText edtManualText; 
-
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -79,18 +73,16 @@ public class MainActivity extends Activity {
 		btnReorderSend = (Button) findViewById(R.id.main_btn_reorder_send);
 		btnStart = (Button) findViewById(R.id.main_btn_start);
 		btnStop = (Button) findViewById(R.id.main_btn_stop);
-		tvLogOut = (TextView) findViewById(R.id.main_txt_log_output);
-		
+
 		edtReorder = (EditText)findViewById(R.id.main_edt_reordertext);
-		edtManualText = (EditText)findViewById(R.id.main_edt_manualtext);
 
 		btnKillChain.setEnabled(false);
 		btnManualTextSend.setEnabled(false);
-		btnReorderSend.setEnabled(false);
+		//		btnReorderSend.setEnabled(false);
 		btnStart.setEnabled(false);
 		btnStop.setEnabled(false);
 
-		generateStatusButtons();
+		tvLogOut = (TextView) findViewById(R.id.main_txt_log_output);
 
 		tvLogOut.setMovementMethod(new ScrollingMovementMethod());
 
@@ -121,50 +113,24 @@ public class MainActivity extends Activity {
 				sendReorderString(newOrder);
 			}
 		});
-		
-		btnManualTextSend.setOnClickListener(new OnClickListener() {
-			
-			@Override
-			public void onClick(View v) {
-				// Send a manual text to the devices
-				String manualText = edtManualText.getText().toString();
-				sendManualString (manualText);
-			}
-		});
 
 	}
 
-	private void sendManualString (String manualText) {
-		
-		manualText = manualText.substring(0, appObj.getNumChainMembers());
-
-		for (int i=1; i <= appObj.getNumChainMembers(); i++) {
-			
-			StringBuilder messageToSend = new StringBuilder("D,");
-			messageToSend.append(i + ",");
-			messageToSend.append(manualText.charAt(i-1));
-			sendChainMessage(messageToSend.toString());
-			
-		}
-
-	}
-	
-	
 	private void sendReorderString (String newOrder) {
 
 		int numChainMembers = appObj.getCurrentTailId();
-		appObj.setNumChainMembers(numChainMembers);
 
-		newOrder = newOrder.substring(0, numChainMembers);
-		
 		StringBuilder messageToSend = new StringBuilder("R,");
 
-		messageToSend.append(newOrder);
+		for (int i=0; i < numChainMembers; i++) {
+			messageToSend.append(i);
+		}
+
+		messageToSend.append("," + newOrder);
 
 		sendChainMessage(messageToSend.toString());
 		shutDownClientQueryThread ();
 		edtReorder.setEnabled(false);
-		//TODO: Wieder auskommentieren, damit es so funktioniert wie es soll
 		btnReorderSend.setEnabled(false);
 		btnManualTextSend.setEnabled(true);
 		btnStart.setEnabled(true);
@@ -194,8 +160,6 @@ public class MainActivity extends Activity {
 
 	private void sendChainMessage (String messageToSend) {
 
-		messageToSend += "\0";
-		
 		if (appObj.getChainThreadStatus() == ChainThreadStatus.ACTIVE) {
 			if (ct != null) {
 				ct.write(messageToSend.getBytes());
@@ -431,23 +395,14 @@ public class MainActivity extends Activity {
 
 			mmInStream = tmpIn;
 			mmOutStream = tmpOut;
-
+			
 			// Post Update to log textview in Main Screen
 			if (handler.post(new AppendToLogViewRunnable(socket.getRemoteDevice().getName() + " is first chain member")
 					) == false) Log.d(TAG, "could not place Runnable in queue") ;
 
 			//TODO: Post UI changes
-			handler.post(new Runnable() {
-
-				@Override
-				public void run() {
-					btnReorderSend.setEnabled(true);
-					btnKillChain.setEnabled(true);
-					updateStatusButtons ();
-				}
-
-			});
-
+			
+			
 		}
 
 
@@ -478,21 +433,20 @@ public class MainActivity extends Activity {
 					if(buffer[0] == 97){
 
 						// Store the Mac Adress of the new Chain Tail and increase the physical ID (+1)
-						String[] tmpStr = Utility.extractStringFromByteArray(buffer, 0).split(",");
-
-						appObj.setCurrentTail(tmpStr[1]);
+						String newTailMac = Utility.extractMAC(buffer, 1);
+						appObj.setCurrentTail(newTailMac);
 						appObj.currentTailId +=1;
-						Log.d(TAG, "new Tail MAC: " + tmpStr[1]);
-
-						handler.post(new AppendToLogViewRunnable(tmpStr[0] + "," + tmpStr[1]));
-
+						Log.d(TAG, "new Tail MAC: " + newTailMac);
+						
+						handler.post(new AppendToLogViewRunnable("A," + newTailMac));
+						
 					}
 
 				} catch (IOException e) {
 					Log.d(TAG, "ChainServer: Chain dropped (IO Exception)");
 					appObj.setChainThreadStatus(ChainThreadStatus.OFF);
 					handler.post(new Runnable() {
-
+						
 						@Override
 						public void run() {
 							// TODO Auto-generated method stub
@@ -507,9 +461,6 @@ public class MainActivity extends Activity {
 		public void write(byte[] bytes) {
 			try {
 				mmOutStream.write(bytes);
-				mmOutStream.flush();
-				
-				
 				Log.d(TAG, "ChainThread: Sending data to Chain");
 			} catch (IOException e) { 
 				Log.d(TAG, "IO Error writing to Chain", e);
@@ -541,7 +492,7 @@ public class MainActivity extends Activity {
 		}
 	}
 
-
+	
 	/**
 	 * Utility function to append a line to the tvLogOut TextView which automagically scrolls down
 	 * to the last / most recent line.
@@ -581,49 +532,5 @@ public class MainActivity extends Activity {
 
 	}
 
-
-	private void updateStatusButtons() {
-
-
-	}
-
-	private void generateStatusButtons() {
-		// TODO Auto-generated method stub
-
-		TableRow tr;
-		Button btnStatus;
-
-		tr = (TableRow) findViewById(R.id.main_status_button_table_layout_row1);
-
-		for (int x = 0; x < 8; x++) {
-			btnStatus = new Button(this);
-			btnStatus.setLayoutParams(new LayoutParams(40,40));
-			btnStatus.setText(String.valueOf(x));
-			btnPhysID[x] = btnStatus;
-			tr.addView(btnStatus);
-		}
-
-	}
-
+	
 }
-
-
-//LayoutParams params = new LinearLayout.LayoutParams(LayoutParams.FILL_PARENT,
-//        LayoutParams.WRAP_CONTENT);
-//TextView tv1 = new TextView(this);
-//TextView tv2=new TextView(this);
-//android.widget.TableRow.LayoutParams trparams = new TableRow.LayoutParams(android.widget.TableRow.LayoutParams.WRAP_CONTENT, android.widget.TableRow.LayoutParams.WRAP_CONTENT);
-//tv1.setLayoutParams(trparams);
-//tv2.setLayoutParams(trparams);
-//tv1.setText("Hello1!");
-//tv2.setText("Hello2!");
-//TableLayout layoutINNER = new TableLayout(this);
-//layoutINNER.setLayoutParams(params);
-//TableRow tr = new TableRow(this);
-//
-//tr.setLayoutParams(params);
-//tr.addView(tv1);
-//tr.addView(tv2);
-//layoutINNER.addView(tr);
-//LinearLayout main = (LinearLayout)findViewById(R.id.android_main_layout);
-//main.addView(layoutINNER);
